@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Budget Manager - مدير الميزانية</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#3b82f6">
+  <link rel="apple-touch-icon" href="icon-192.svg">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').then(reg => console.log('SW registered')).catch(err => console.log('SW error', err));
+      });
+    }
+  </script>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'Tajawal', 'sans-serif'],
+          },
+          colors: {
+            primary: 'var(--color-primary)',
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --color-primary: #3b82f6; /* Default blue */
+    }
+    body {
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+    /* Hide scrollbar for cleaner look */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(156, 163, 175, 0.5);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(156, 163, 175, 0.8);
+    }
+  </style>
+
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Framer Motion -->
+  <script src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-50 min-h-screen">
+  <div id="root"></div>
+  <script type="text/babel">
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+const motion = window.Motion ? window.Motion.motion : { 
+  div: React.forwardRef((props, ref) => {
+    const { initial, animate, exit, whileHover, ...rest } = props;
+    return <div ref={ref} {...rest} />;
+  }),
+  button: React.forwardRef((props, ref) => {
+    const { initial, animate, exit, whileHover, ...rest } = props;
+    return <button ref={ref} {...rest} />;
+  })
+};
+const AnimatePresence = window.Motion ? window.Motion.AnimatePresence : ({children}) => <>{children}</>;
+
+const t = {
+  ar: {
+    appTitle: "مدير الميزانية",
+    totalBudget: "المبلغ الإجمالي",
+    summary: "الملخص",
+    allocated: "الموزع",
+    remaining: "المتبقي",
+    categoriesCount: "عدد الأقسام",
+    addCategory: "إضافة قسم",
+    resetData: "إعادة ضبط",
+    language: "اللغة",
+    theme: "المظهر",
+    primaryColor: "اللون الرئيسي",
+    amount: "المبلغ",
+    percentage: "النسبة",
+    delete: "حذف",
+    edit: "تعديل",
+    save: "حفظ",
+    cancel: "إلغاء",
+    errorExceeds: "تنبيه: مجموع الأقسام يتجاوز المبلغ الإجمالي!",
+    unallocated: "غير موزع",
+    noCategories: "لا توجد أقسام، أضف قسمًا جديدًا.",
+    addNewCategoryTitle: "إضافة قسم جديد",
+    icon: "الأيقونة",
+    color: "اللون",
+    add: "إضافة",
+    currency: "درهم",
+    selectIcon: "اختر أيقونة",
+    customName: "اسم القسم"
+  },
+  en: {
+    appTitle: "Budget Manager",
+    totalBudget: "Total Budget",
+    summary: "Summary",
+    allocated: "Allocated",
+    remaining: "Remaining",
+    categoriesCount: "Categories Count",
+    addCategory: "Add Category",
+    resetData: "Reset Data",
+    language: "Language",
+    theme: "Theme",
+    primaryColor: "Primary Color",
+    amount: "Amount",
+    percentage: "Percentage",
+    delete: "Delete",
+    edit: "Edit",
+    save: "Save",
+    cancel: "Cancel",
+    errorExceeds: "Warning: Sum of categories exceeds the total budget!",
+    unallocated: "Unallocated",
+    noCategories: "No categories found. Add a new one.",
+    addNewCategoryTitle: "Add New Category",
+    icon: "Icon",
+    color: "Color",
+    add: "Add",
+    currency: "$",
+    selectIcon: "Select Icon",
+    customName: "Category Name"
+  },
+  fr: {
+    appTitle: "Gestionnaire de Budget",
+    totalBudget: "Budget Total",
+    summary: "Résumé",
+    allocated: "Alloué",
+    remaining: "Restant",
+    categoriesCount: "Nombre de catégories",
+    addCategory: "Ajouter Catégorie",
+    resetData: "Réinitialiser",
+    language: "Langue",
+    theme: "Thème",
+    primaryColor: "Couleur Principale",
+    amount: "Montant",
+    percentage: "Pourcentage",
+    delete: "Supprimer",
+    edit: "Modifier",
+    save: "Enregistrer",
+    cancel: "Annuler",
+    errorExceeds: "Attention : La somme dépasse le budget total !",
+    unallocated: "Non alloué",
+    noCategories: "Aucune catégorie. Ajoutez-en une nouvelle.",
+    addNewCategoryTitle: "Ajouter une nouvelle catégorie",
+    icon: "Icône",
+    color: "Couleur",
+    add: "Ajouter",
+    currency: "€",
+    selectIcon: "Sélectionner Icône",
+    customName: "Nom de la Catégorie"
+  }
+};
+
+const defaultCategories = [
+  { id: '1', name: { ar: 'السفر', en: 'Travel', fr: 'Voyage' }, amount: 1500, color: '#3b82f6', icon: 'Plane' },
+  { id: '2', name: { ar: 'الإنترنت', en: 'Internet', fr: 'Internet' }, amount: 500, color: '#10b981', icon: 'Wifi' },
+  { id: '3', name: { ar: 'الأكل', en: 'Food', fr: 'Nourriture' }, amount: 2000, color: '#f59e0b', icon: 'Utensils' },
+  { id: '4', name: { ar: 'الدراسة', en: 'Study', fr: 'Études' }, amount: 1000, color: '#8b5cf6', icon: 'BookOpen' },
+  { id: '5', name: { ar: 'الادخار', en: 'Savings', fr: 'Épargne' }, amount: 3000, color: '#14b8a6', icon: 'PiggyBank' },
+  { id: '6', name: { ar: 'الفواتير', en: 'Bills', fr: 'Factures' }, amount: 800, color: '#ef4444', icon: 'Receipt' },
+  { id: '7', name: { ar: 'الترفيه', en: 'Entertainment', fr: 'Divertissement' }, amount: 700, color: '#ec4899', icon: 'Gamepad2' },
+];
+
+const availableIcons = ['Plane', 'Wifi', 'Utensils', 'BookOpen', 'PiggyBank', 'Receipt', 'Gamepad2', 'MoreHorizontal'];
+const availableColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#14b8a6', '#ef4444', '#ec4899', '#6b7280', '#eab308', '#06b6d4'];
+
+const icons = {
+  Plane: <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.2-1.1.6L2.5 9l8.1 4.5L7 17H4l-1 1 3 2 2 3 1-1v-3l3.5-3.6 4.5 8.1c.3.5.7.8 1.2.6l2.2-1.2c.4-.2.7-.6.6-1.1z"/>,
+  Wifi: <><path d="M5 13a10 10 0 0 1 14 0"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M2 8.82a15 15 0 0 1 20 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></>,
+  Utensils: <><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></>,
+  BookOpen: <><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></>,
+  PiggyBank: <><path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2h0V5z"/><path d="M2 9v1c0 1.1.9 2 2 2h1"/><path d="M16 11h0"/></>,
+  Receipt: <><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17V7"/></>,
+  Gamepad2: <><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/></>,
+  MoreHorizontal: <><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></>,
+  Plus: <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
+  Trash2: <><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>,
+  Edit2: <><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></>,
+  Check: <polyline points="20 6 9 17 4 12"/>,
+  X: <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+  Sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M6.34 17.66l-1.41 1.41"/><path d="M19.07 4.93l-1.41 1.41"/></>,
+  Moon: <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>,
+  PieChart: <><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></>,
+  AlertCircle: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
+  RefreshCw: <><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></>,
+  Palette: <><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></>
+};
+
+const Icon = ({ name, className = "" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    {icons[name] || <circle cx="12" cy="12" r="10"/>}
+  </svg>
+);
+
+const currencies = [
+  { code: 'USD', symbol: '$', name: { ar: 'دولار أمريكي', en: 'US Dollar', fr: 'Dollar Américain' } },
+  { code: 'EUR', symbol: '€', name: { ar: 'يورو', en: 'Euro', fr: 'Euro' } },
+  { code: 'GBP', symbol: '£', name: { ar: 'جنيه إسترليني', en: 'British Pound', fr: 'Livre Sterling' } },
+  { code: 'JPY', symbol: '¥', name: { ar: 'ين ياباني', en: 'Japanese Yen', fr: 'Yen Japonais' } },
+  { code: 'CNY', symbol: '¥', name: { ar: 'يوان صيني', en: 'Chinese Yuan', fr: 'Yuan Chinois' } },
+  { code: 'DZD', symbol: 'د.ج', name: { ar: 'دينار جزائري', en: 'Algerian Dinar', fr: 'Dinar Algérien' } },
+  { code: 'BHD', symbol: 'د.ب', name: { ar: 'دينار بحريني', en: 'Bahraini Dinar', fr: 'Dinar Bahreïni' } },
+  { code: 'EGP', symbol: 'ج.م', name: { ar: 'جنيه مصري', en: 'Egyptian Pound', fr: 'Livre Égyptienne' } },
+  { code: 'IQD', symbol: 'د.ع', name: { ar: 'دينار عراقي', en: 'Iraqi Dinar', fr: 'Dinar Irakien' } },
+  { code: 'JOD', symbol: 'د.أ', name: { ar: 'دينار أردني', en: 'Jordanian Dinar', fr: 'Dinar Jordanien' } },
+  { code: 'KWD', symbol: 'د.ك', name: { ar: 'دينار كويتي', en: 'Kuwaiti Dinar', fr: 'Dinar Koweïtien' } },
+  { code: 'LBP', symbol: 'ل.ل', name: { ar: 'ليرة لبنانية', en: 'Lebanese Pound', fr: 'Livre Libanaise' } },
+  { code: 'LYD', symbol: 'د.ل', name: { ar: 'دينار ليبي', en: 'Libyan Dinar', fr: 'Dinar Libyen' } },
+  { code: 'MAD', symbol: 'د.م.', name: { ar: 'درهم مغربي', en: 'Moroccan Dirham', fr: 'Dirham Marocain' } },
+  { code: 'MRU', symbol: 'أ.م', name: { ar: 'أوقية موريتانية', en: 'Mauritanian Ouguiya', fr: 'Ouguiya Mauritanien' } },
+  { code: 'OMR', symbol: 'ر.ع.', name: { ar: 'ريال عماني', en: 'Omani Rial', fr: 'Rial Omanais' } },
+  { code: 'QAR', symbol: 'ر.ق', name: { ar: 'ريال قطري', en: 'Qatari Riyal', fr: 'Riyal Qatari' } },
+  { code: 'SAR', symbol: 'ر.س', name: { ar: 'ريال سعودي', en: 'Saudi Riyal', fr: 'Riyal Saoudien' } },
+  { code: 'SDG', symbol: 'ج.س', name: { ar: 'جنيه سوداني', en: 'Sudanese Pound', fr: 'Livre Soudanaise' } },
+  { code: 'SYP', symbol: 'ل.س', name: { ar: 'ليرة سورية', en: 'Syrian Pound', fr: 'Livre Syrienne' } },
+  { code: 'TND', symbol: 'د.ت', name: { ar: 'دينار تونسي', en: 'Tunisian Dinar', fr: 'Dinar Tunisien' } },
+  { code: 'AED', symbol: 'د.إ', name: { ar: 'درهم إماراتي', en: 'UAE Dirham', fr: 'Dirham des EAU' } },
+  { code: 'YER', symbol: 'ر.ي', name: { ar: 'ريال يمني', en: 'Yemeni Rial', fr: 'Rial Yéménite' } },
+];
+
+const DonutChart = ({ categories, totalBudget, language, tLanguage, currencySymbol }) => {
+  const canvasRef = useRef(null);
+  const chartInstanceRef = useRef(null);
+
+  useEffect(() => {
+    if (!canvasRef.current || !window.Chart) return;
+    
+    if (chartInstanceRef.current) {
+      chartInstanceRef.current.destroy();
+    }
+
+    const ctx = canvasRef.current.getContext('2d');
+    const numericTotal = Number(totalBudget) || 0;
+    const allocated = categories.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+    const unallocated = Math.max(0, numericTotal - allocated);
+    
+    const dataLabels = categories.map(c => typeof c.name === 'object' ? c.name[language] || c.name.en : c.name);
+    const dataValues = categories.map(c => c.amount);
+    const bgColors = categories.map(c => c.color);
+    
+    if (unallocated > 0) {
+      dataLabels.push(tLanguage.unallocated);
+      dataValues.push(unallocated);
+      bgColors.push(document.documentElement.classList.contains('dark') ? '#334155' : '#e2e8f0');
+    }
+
+    if (numericTotal === 0 && dataValues.length === 0) {
+      dataLabels.push('Empty');
+      dataValues.push(1);
+      bgColors.push(document.documentElement.classList.contains('dark') ? '#334155' : '#e2e8f0');
+    }
+
+    chartInstanceRef.current = new window.Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: dataLabels,
+        datasets: [{
+          data: dataValues,
+          backgroundColor: bgColors,
+          borderWidth: 0,
+          hoverOffset: 12
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '72%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: document.documentElement.classList.contains('dark') ? '#1e293b' : '#ffffff',
+            titleColor: document.documentElement.classList.contains('dark') ? '#f8fafc' : '#0f172a',
+            bodyColor: document.documentElement.classList.contains('dark') ? '#cbd5e1' : '#475569',
+            borderColor: document.documentElement.classList.contains('dark') ? '#334155' : '#e2e8f0',
+            borderWidth: 1,
+            padding: 12,
+            cornerRadius: 8,
+            boxPadding: 6,
+            usePointStyle: true,
+            callbacks: {
+              label: function(context) {
+                let label = context.label || '';
+                if (label) label += ': ';
+                if (context.parsed !== null && Number(totalBudget) > 0) {
+                  label += new Intl.NumberFormat(language === 'ar' ? 'ar-SA' : language === 'fr' ? 'fr-FR' : 'en-US').format(context.parsed) + ' ' + currencySymbol;
+                }
+                return label;
+              }
+            }
+          }
+        },
+        animation: { animateScale: true, animateRotate: true }
+      }
+    });
+
+    return () => {
+      if (chartInstanceRef.current) chartInstanceRef.current.destroy();
+    };
+  }, [categories, totalBudget, language, tLanguage]);
+
+  return (
+    <div className="w-full h-72 relative">
+      <canvas ref={canvasRef} />
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none pb-2">
+        <div className="text-center bg-white/60 dark:bg-slate-800/60 backdrop-blur-md px-6 py-4 rounded-full shadow-sm border border-white/20 dark:border-slate-700/50">
+            <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">{tLanguage.totalBudget}</p>
+            <p className="text-2xl font-bold text-slate-800 dark:text-white">
+                {new Intl.NumberFormat(language === 'ar' ? 'ar-SA' : language === 'fr' ? 'fr-FR' : 'en-US').format(Number(totalBudget) || 0)} <span className="text-sm font-normal text-slate-500">{currencySymbol}</span>
+            </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CategoryItem = ({ category, totalBudget, onChange, onDelete, language, tLanguage, currencySymbol }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editAmount, setEditAmount] = useState(category.amount);
+  const numericTotal = Number(totalBudget) || 0;
+  const [editPercent, setEditPercent] = useState(numericTotal > 0 ? (category.amount / numericTotal * 100).toFixed(1) : 0);
+  
+  const percentage = numericTotal > 0 ? ((category.amount / numericTotal) * 100).toFixed(1) : 0;
+  
+  const handleAmountChange = (e) => {
+    if (e.target.value === '') {
+      setEditAmount('');
+      setEditPercent(0);
+      return;
+    }
+    let val = parseFloat(e.target.value);
+    if (isNaN(val) || val < 0) val = 0;
+    setEditAmount(val);
+    setEditPercent(numericTotal > 0 ? (val / numericTotal * 100).toFixed(1) : 0);
+  };
+
+  const handlePercentChange = (e) => {
+    if (e.target.value === '') {
+      setEditPercent('');
+      setEditAmount(0);
+      return;
+    }
+    let val = parseFloat(e.target.value);
+    if (isNaN(val) || val < 0) val = 0;
+    if (val > 100) val = 100;
+    setEditPercent(val);
+    setEditAmount((val / 100) * numericTotal);
+  };
+
+  const save = () => {
+    onChange({ ...category, amount: editAmount });
+    setIsEditing(false);
+  };
+
+  const catName = typeof category.name === 'object' ? category.name[language] || category.name.en : category.name;
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      whileHover={{ scale: 1.01 }}
+      className="bg-white dark:bg-slate-800/80 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700/50 flex flex-col gap-3 transition-all duration-300"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: category.color, boxShadow: `0 4px 14px 0 ${category.color}40` }}>
+            <Icon name={category.icon} className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-800 dark:text-slate-100">{catName}</h3>
+            {!isEditing && (
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                {new Intl.NumberFormat().format(category.amount)} {currencySymbol} 
+                <span className="mx-2 text-slate-300 dark:text-slate-600">•</span>
+                <span className="text-primary font-bold">{percentage}%</span>
+              </p>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-1">
+          {isEditing ? (
+            <>
+              <button onClick={save} className="p-2 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-xl transition-colors">
+                <Icon name="Check" className="w-5 h-5" />
+              </button>
+              <button onClick={() => { setIsEditing(false); setEditAmount(category.amount); }} className="p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors">
+                <Icon name="X" className="w-5 h-5" />
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setIsEditing(true)} className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-xl transition-colors">
+                <Icon name="Edit2" className="w-5 h-5" />
+              </button>
+              <button onClick={() => onDelete(category.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors">
+                <Icon name="Trash2" className="w-5 h-5" />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {isEditing && (
+        <motion.div 
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          className="flex gap-4 pt-3 mt-1 border-t border-slate-100 dark:border-slate-700/50"
+        >
+          <div className="flex-1 space-y-1.5">
+            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{tLanguage.amount}</label>
+            <div className="relative">
+                <input 
+                  type="number" 
+                  value={editAmount} 
+                  onChange={handleAmountChange}
+                  className="w-full pl-3 pr-8 py-2 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary dark:text-white"
+                />
+            </div>
+          </div>
+          <div className="flex-1 space-y-1.5">
+            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{tLanguage.percentage} (%)</label>
+            <input 
+              type="number" 
+              value={editPercent} 
+              onChange={handlePercentChange}
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary dark:text-white"
+            />
+          </div>
+        </motion.div>
+      )}
+    </motion.div>
+  );
+};
+
+const AddCategory = ({ onAdd, onCancel, tLanguage, language }) => {
+  const [name, setName] = useState('');
+  const [amount, setAmount] = useState('');
+  const [color, setColor] = useState(availableColors[0]);
+  const [icon, setIcon] = useState(availableIcons[0]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!name || !amount) return;
+    onAdd({
+      id: Date.now().toString(),
+      name: { [language]: name },
+      amount: parseFloat(amount),
+      color,
+      icon
+    });
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-xl border border-primary/20 relative overflow-hidden"
+    >
+      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-emerald-400"></div>
+      <h3 className="font-bold text-lg mb-5 text-slate-800 dark:text-white">{tLanguage.addNewCategoryTitle}</h3>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">{tLanguage.customName}</label>
+              <input 
+                type="text" 
+                value={name} 
+                onChange={e => setName(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary dark:text-white transition-shadow"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">{tLanguage.amount}</label>
+              <input 
+                type="number" 
+                value={amount} 
+                onChange={e => setAmount(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary dark:text-white transition-shadow"
+                required min="0"
+              />
+            </div>
+        </div>
+        
+        <div>
+          <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">{tLanguage.color}</label>
+          <div className="flex gap-3 flex-wrap">
+            {availableColors.map(c => (
+              <button 
+                type="button" key={c} onClick={() => setColor(c)}
+                className={`w-10 h-10 rounded-full transition-all duration-300 shadow-sm ${color === c ? 'scale-110 ring-4 ring-offset-2 dark:ring-offset-slate-800 ring-primary/40' : 'hover:scale-110 hover:shadow-md'}`}
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">{tLanguage.selectIcon}</label>
+          <div className="flex gap-3 flex-wrap">
+            {availableIcons.map(i => (
+              <button 
+                type="button" key={i} onClick={() => setIcon(i)}
+                className={`p-3 rounded-2xl transition-all duration-300 ${icon === i ? 'bg-primary text-white shadow-lg shadow-primary/30 scale-105' : 'bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 hover:scale-105'}`}
+              >
+                <Icon name={i} className="w-6 h-6" />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex gap-4 pt-4">
+          <button type="submit" className="flex-1 py-3 bg-primary text-white font-semibold rounded-xl hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 active:scale-95">
+            {tLanguage.add}
+          </button>
+          <button type="button" onClick={onCancel} className="flex-1 py-3 bg-slate-100 dark:bg-slate-700/50 text-slate-700 dark:text-slate-200 font-semibold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95">
+            {tLanguage.cancel}
+          </button>
+        </div>
+      </form>
+    </motion.div>
+  );
+};
+
+let audioCtx = null;
+const playSound = (type = 'click') => {
+  try {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    if (type === 'click') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+      osc.start(audioCtx.currentTime);
+      osc.stop(audioCtx.currentTime + 0.1);
+    } else if (type === 'wealth') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+      osc.frequency.setValueAtTime(554.37, audioCtx.currentTime + 0.1);
+      osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.2);
+      gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+      osc.start(audioCtx.currentTime);
+      osc.stop(audioCtx.currentTime + 0.5);
+    } else if (type === 'poverty') {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.3);
+      gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+      osc.start(audioCtx.currentTime);
+      osc.stop(audioCtx.currentTime + 0.3);
+    }
+  } catch (e) {}
+};
+
+const Particles = ({ type }) => {
+  const emojis = type === 'wealth' ? ['💰', '💵', '✨', '💎'] : ['🕸️', '🍂', '📉', '💀'];
+  return (
+    <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none opacity-40">
+      {[...Array(8)].map((_, i) => (
+        <motion.div
+          key={i}
+          className="absolute text-2xl"
+          initial={{ 
+            y: type === 'wealth' ? '120%' : '-20%', 
+            x: `${Math.random() * 100}%`,
+            opacity: 0,
+            scale: 0.5
+          }}
+          animate={{ 
+            y: type === 'wealth' ? '-20%' : '120%',
+            opacity: [0, 1, 0],
+            scale: [0.5, 1.2, 0.5],
+            rotate: [0, Math.random() * 360]
+          }}
+          transition={{ 
+            duration: 2 + Math.random() * 3, 
+            repeat: Infinity, 
+            delay: Math.random() * 2 
+          }}
+        >
+          {emojis[i % emojis.length]}
+        </motion.div>
+      ))}
+    </div>
+  );
+};
+
+const App = () => {
+  const [language, setLanguage] = useState(() => localStorage.getItem('budget_lang') || 'ar');
+  const [theme, setTheme] = useState(() => localStorage.getItem('budget_theme') || 'light');
+  const [primaryColor, setPrimaryColor] = useState(() => localStorage.getItem('budget_primary') || '#3b82f6');
+  const [currencySymbol, setCurrencySymbol] = useState(() => localStorage.getItem('budget_currency') || '$');
+  
+  const [totalBudget, setTotalBudget] = useState(() => {
+    const saved = localStorage.getItem('budget_total');
+    return saved !== null ? (saved === '' ? '' : parseFloat(saved)) : '';
+  });
+  
+  const [categories, setCategories] = useState(() => {
+    const saved = localStorage.getItem('budget_categories');
+    return saved ? JSON.parse(saved) : defaultCategories;
+  });
+
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [showSplash, setShowSplash] = useState(true);
+
+  const tLanguage = t[language];
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), 2500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('budget_lang', language);
+    document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.lang = language;
+  }, [language]);
+
+  useEffect(() => {
+    localStorage.setItem('budget_theme', theme);
+    if (theme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+  }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem('budget_primary', primaryColor);
+    document.documentElement.style.setProperty('--color-primary', primaryColor);
+  }, [primaryColor]);
+
+  useEffect(() => {
+    localStorage.setItem('budget_currency', currencySymbol);
+  }, [currencySymbol]);
+
+  useEffect(() => {
+    localStorage.setItem('budget_total', totalBudget);
+  }, [totalBudget]);
+
+  useEffect(() => {
+    localStorage.setItem('budget_categories', JSON.stringify(categories));
+    const totalAllocated = categories.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+    const numericTotal = Number(totalBudget) || 0;
+    if (totalAllocated > numericTotal && numericTotal > 0) {
+      setErrorMsg(tLanguage.errorExceeds);
+    } else {
+      setErrorMsg('');
+    }
+  }, [categories, totalBudget, language]);
+
+  const resetData = () => {
+    if(confirm(tLanguage.resetData + '?')) {
+      setTotalBudget('');
+      setCategories(categories.map(c => ({ ...c, amount: '' })));
+    }
+  };
+
+  const numericTotalBudget = Number(totalBudget) || 0;
+  const allocated = categories.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  const remaining = numericTotalBudget - allocated;
+
+  const isWealthy = numericTotalBudget > 0 && remaining >= numericTotalBudget * 0.5;
+  const isPoor = remaining < 0;
+
+  const prevWealthRef = useRef(false);
+  const prevPoorRef = useRef(false);
+
+  useEffect(() => {
+    if (isWealthy && !prevWealthRef.current) playSound('wealth');
+    if (isPoor && !prevPoorRef.current) playSound('poverty');
+    
+    prevWealthRef.current = isWealthy;
+    prevPoorRef.current = isPoor;
+  }, [isWealthy, isPoor]);
+
+  useEffect(() => {
+    const handleInteraction = (e) => {
+      if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
+        playSound('click');
+      }
+    };
+    document.addEventListener('mousedown', handleInteraction);
+    return () => document.removeEventListener('mousedown', handleInteraction);
+  }, []);
+
+  if (showSplash) {
+    return (
+      <AnimatePresence>
+        <motion.div 
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-slate-50 dark:bg-slate-900 z-[100] flex flex-col items-center justify-center transition-colors duration-300"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="flex flex-col items-center gap-6"
+          >
+            <div className="relative">
+              <motion.div 
+                animate={{ rotate: 360 }} 
+                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                className="absolute -inset-8 bg-gradient-to-r from-primary to-emerald-400 opacity-20 blur-2xl rounded-full"
+              />
+              <img src="./logo.png" alt="Logo" className="w-32 h-32 rounded-3xl object-contain drop-shadow-2xl relative z-10" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+              <div className="w-32 h-32 rounded-3xl bg-gradient-to-br from-primary to-blue-400 text-white flex items-center justify-center shadow-2xl shadow-primary/40 relative z-10 hidden">
+                <Icon name="PieChart" className="w-16 h-16" />
+              </div>
+            </div>
+            
+            <motion.h1 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-500 dark:from-white dark:to-slate-400 tracking-tight"
+            >
+              {tLanguage.appTitle}
+            </motion.h1>
+            
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.6 }}
+              className="flex items-center gap-2 mt-8"
+            >
+              <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+              <div className="w-2 h-2 rounded-full bg-primary animate-pulse" style={{ animationDelay: "0.2s" }}></div>
+              <div className="w-2 h-2 rounded-full bg-primary animate-pulse" style={{ animationDelay: "0.4s" }}></div>
+            </motion.div>
+          </motion.div>
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+      className="min-h-screen font-sans bg-slate-50 dark:bg-slate-900 transition-colors duration-300 pb-24 text-slate-900 dark:text-slate-50 selection:bg-primary/30"
+    >
+      
+      {/* Navbar */}
+      <header className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl sticky top-0 z-50 border-b border-slate-200/50 dark:border-slate-800/50 shadow-sm">
+        <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src="./logo.png" alt="Logo" className="w-12 h-12 rounded-xl object-contain drop-shadow-md" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-blue-400 text-white flex items-center justify-center shadow-lg shadow-primary/30 hidden">
+              <Icon name="PieChart" className="w-6 h-6" />
+            </div>
+            <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-500 dark:from-white dark:to-slate-400">
+                {tLanguage.appTitle}
+            </h1>
+          </div>
+          
+          <div className="flex items-center gap-2 md:gap-4">
+            <div className="relative group">
+                <select 
+                value={currencySymbol} 
+                onChange={e => setCurrencySymbol(e.target.value)}
+                className="appearance-none bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl px-4 py-2 text-sm font-medium border border-slate-200 dark:border-slate-700 outline-none cursor-pointer focus:ring-2 focus:ring-primary transition-all hover:bg-slate-200 dark:hover:bg-slate-700"
+                >
+                  {currencies.map(c => (
+                    <option key={c.code} value={c.symbol}>{c.name[language]} ({c.symbol})</option>
+                  ))}
+                </select>
+            </div>
+
+            <div className="relative group">
+                <select 
+                value={language} 
+                onChange={e => setLanguage(e.target.value)}
+                className="appearance-none bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl px-4 py-2 text-sm font-medium border border-slate-200 dark:border-slate-700 outline-none cursor-pointer focus:ring-2 focus:ring-primary transition-all hover:bg-slate-200 dark:hover:bg-slate-700"
+                >
+                <option value="ar">العربية</option>
+                <option value="en">English</option>
+                <option value="fr">Français</option>
+                </select>
+            </div>
+
+            <button 
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all hover:scale-105 active:scale-95"
+            >
+              <Icon name={theme === 'dark' ? 'Sun' : 'Moon'} className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
+        
+        {/* Total Budget Hero Section */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white dark:bg-slate-800/80 rounded-3xl shadow-2xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700/50 p-8 md:p-10 mb-10 overflow-hidden relative"
+        >
+          <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl"></div>
+          <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-emerald-400/5 rounded-full blur-3xl"></div>
+          
+          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div className="flex-1 w-full">
+                <label className="block text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">{tLanguage.totalBudget}</label>
+                <div className="relative flex items-end">
+                    <input 
+                    type="number"
+                    value={totalBudget}
+                    onChange={e => setTotalBudget(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                    className="w-full text-5xl md:text-7xl font-extrabold bg-transparent border-none focus:outline-none focus:ring-0 p-0 m-0 dark:text-white transition-colors"
+                    min="0"
+                    />
+                    <span className="text-2xl font-medium text-slate-400 mb-2 ml-2 mr-2">{currencySymbol}</span>
+                </div>
+                <div className="h-1 w-full bg-slate-100 dark:bg-slate-700 mt-4 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-primary to-emerald-400 transition-all duration-500" style={{ width: `${Math.min(100, (allocated/(Number(totalBudget)||1))*100 || 0)}%` }}></div>
+                </div>
+              </div>
+              
+              <button onClick={resetData} className="flex items-center gap-2 px-5 py-3 rounded-xl bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 font-medium hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10 transition-all active:scale-95">
+                <Icon name="RefreshCw" className="w-5 h-5" />
+                <span className="md:hidden">{tLanguage.resetData}</span>
+              </button>
+          </div>
+          
+          <AnimatePresence>
+            {errorMsg && (
+              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} className="mt-6 flex items-center gap-3 text-red-500 bg-red-50 dark:bg-red-500/10 p-4 rounded-xl text-sm font-medium border border-red-100 dark:border-red-500/20">
+                <Icon name="AlertCircle" className="w-5 h-5 flex-shrink-0" />
+                {errorMsg}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          {/* Left Column */}
+          <div className="lg:col-span-5 space-y-8">
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+              className="bg-white dark:bg-slate-800/80 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none border border-slate-100 dark:border-slate-700/50 p-8"
+            >
+              <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-8 flex items-center gap-2">
+                  <Icon name="PieChart" className="w-5 h-5 text-primary" /> {tLanguage.summary}
+              </h2>
+              
+              <DonutChart categories={categories} totalBudget={totalBudget} language={language} tLanguage={tLanguage} currencySymbol={currencySymbol} />
+              
+              <div className="mt-8">
+                <div className={`relative overflow-hidden bg-gradient-to-br p-5 rounded-2xl border ${remaining < 0 ? 'from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-900/10 border-red-200 dark:border-red-800/50' : 'from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-900/10 border-emerald-200 dark:border-emerald-800/50'}`}>
+                  {isWealthy && <Particles type="wealth" />}
+                  {isPoor && <Particles type="poverty" />}
+                  <div className="relative z-10">
+                    <p className={`text-xs font-semibold uppercase tracking-wider mb-2 ${remaining < 0 ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>{tLanguage.remaining}</p>
+                    <p className={`text-xl font-bold ${remaining < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-300'}`}>
+                      {new Intl.NumberFormat().format(remaining)} <span className="text-sm font-normal opacity-70">{currencySymbol}</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+            
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-white dark:bg-slate-800/80 rounded-3xl shadow-xl shadow-slate-200/40 dark:shadow-none border border-slate-100 dark:border-slate-700/50 p-6 flex items-center justify-between"
+            >
+              <div className="flex items-center gap-4">
+                  <div className="p-3 bg-slate-100 dark:bg-slate-700/50 rounded-xl text-slate-500 dark:text-slate-300">
+                    <Icon name="Palette" className="w-6 h-6" />
+                  </div>
+                  <p className="font-semibold text-slate-700 dark:text-slate-200">{tLanguage.primaryColor}</p>
+              </div>
+              <div className="flex gap-2">
+                {availableColors.slice(0, 5).map(c => (
+                  <button 
+                    key={c} onClick={() => setPrimaryColor(c)}
+                    className={`w-8 h-8 rounded-full transition-all duration-300 ${primaryColor === c ? 'scale-125 ring-4 ring-offset-2 dark:ring-offset-slate-800 ring-slate-200 dark:ring-slate-600' : 'hover:scale-110'}`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Right Column */}
+          <div className="lg:col-span-7">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+                {tLanguage.categoriesCount} 
+                <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-3 py-1 rounded-lg text-sm">{categories.length}</span>
+              </h2>
+              <button 
+                onClick={() => setShowAddForm(!showAddForm)}
+                className="flex items-center gap-2 bg-slate-800 dark:bg-white text-white dark:text-slate-900 px-5 py-2.5 rounded-xl hover:bg-slate-700 dark:hover:bg-slate-200 transition-all shadow-lg active:scale-95 font-semibold"
+              >
+                <Icon name={showAddForm ? 'X' : 'Plus'} className="w-5 h-5" />
+                <span className="hidden sm:inline">{showAddForm ? tLanguage.cancel : tLanguage.addCategory}</span>
+              </button>
+            </div>
+
+            <AnimatePresence>
+              {showAddForm && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, height: 'auto', scale: 1 }}
+                  exit={{ opacity: 0, height: 0, scale: 0.95 }}
+                  className="mb-6 overflow-hidden"
+                >
+                  <AddCategory onAdd={(cat) => { setCategories([...categories, cat]); setShowAddForm(false); }} onCancel={() => setShowAddForm(false)} tLanguage={tLanguage} language={language} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="space-y-4">
+              <AnimatePresence>
+                {categories.length === 0 ? (
+                  <motion.div 
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} 
+                    className="text-center py-20 bg-white/50 dark:bg-slate-800/30 rounded-3xl border-2 border-slate-200 dark:border-slate-700 border-dashed backdrop-blur-sm"
+                  >
+                    <Icon name="PieChart" className="w-16 h-16 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
+                    <p className="text-lg text-slate-500 dark:text-slate-400 font-medium">{tLanguage.noCategories}</p>
+                    <button onClick={() => setShowAddForm(true)} className="mt-4 text-primary font-semibold hover:underline">
+                        {tLanguage.addCategory}
+                    </button>
+                  </motion.div>
+                ) : (
+                  categories.map(cat => (
+                    <CategoryItem 
+                      key={cat.id} 
+                      category={cat} 
+                      totalBudget={totalBudget}
+                      onChange={(updatedCat) => setCategories(categories.map(c => c.id === updatedCat.id ? updatedCat : c))}
+                      onDelete={(id) => setCategories(categories.filter(c => c.id !== id))}
+                      language={language}
+                      tLanguage={tLanguage}
+                      currencySymbol={currencySymbol}
+                    />
+                  ))
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </div>
+      </main>
+    </motion.div>
+  );
+};
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+
+</script>
+</body>
+</html>
+
