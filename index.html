@@ -215,7 +215,9 @@ const icons = {
   PieChart: <><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></>,
   AlertCircle: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
   RefreshCw: <><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></>,
-  Palette: <><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></>
+  Palette: <><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></>,
+  Volume2: <><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></>,
+  VolumeX: <><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></>
 };
 
 const Icon = ({ name, className = "" }) => (
@@ -577,23 +579,6 @@ const playSound = (type = 'click') => {
       gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
       osc.start(audioCtx.currentTime);
       osc.stop(audioCtx.currentTime + 0.1);
-    } else if (type === 'wealth') {
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(440, audioCtx.currentTime);
-      osc.frequency.setValueAtTime(554.37, audioCtx.currentTime + 0.1);
-      osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.2);
-      gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
-      gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
-      osc.start(audioCtx.currentTime);
-      osc.stop(audioCtx.currentTime + 0.5);
-    } else if (type === 'poverty') {
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.3);
-      gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
-      gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
-      osc.start(audioCtx.currentTime);
-      osc.stop(audioCtx.currentTime + 0.3);
     }
   } catch (e) {}
 };
@@ -650,6 +635,10 @@ const App = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [showSplash, setShowSplash] = useState(true);
+  const [isSoundEnabled, setIsSoundEnabled] = useState(() => {
+    const saved = localStorage.getItem('budget_sound');
+    return saved !== null ? saved === 'true' : true;
+  });
 
   const tLanguage = t[language];
 
@@ -663,6 +652,10 @@ const App = () => {
     document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = language;
   }, [language]);
+
+  useEffect(() => {
+    localStorage.setItem('budget_sound', isSoundEnabled);
+  }, [isSoundEnabled]);
 
   useEffect(() => {
     localStorage.setItem('budget_theme', theme);
@@ -708,26 +701,15 @@ const App = () => {
   const isWealthy = numericTotalBudget > 0 && remaining >= numericTotalBudget * 0.5;
   const isPoor = remaining < 0;
 
-  const prevWealthRef = useRef(false);
-  const prevPoorRef = useRef(false);
-
-  useEffect(() => {
-    if (isWealthy && !prevWealthRef.current) playSound('wealth');
-    if (isPoor && !prevPoorRef.current) playSound('poverty');
-    
-    prevWealthRef.current = isWealthy;
-    prevPoorRef.current = isPoor;
-  }, [isWealthy, isPoor]);
-
   useEffect(() => {
     const handleInteraction = (e) => {
-      if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
+      if (isSoundEnabled && (e.target.closest('button') || e.target.closest('input') || e.target.closest('select'))) {
         playSound('click');
       }
     };
     document.addEventListener('mousedown', handleInteraction);
     return () => document.removeEventListener('mousedown', handleInteraction);
-  }, []);
+  }, [isSoundEnabled]);
 
   if (showSplash) {
     return (
@@ -822,6 +804,13 @@ const App = () => {
                 <option value="fr">Français</option>
                 </select>
             </div>
+
+            <button 
+              onClick={() => setIsSoundEnabled(!isSoundEnabled)}
+              className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all hover:scale-105 active:scale-95"
+            >
+              <Icon name={isSoundEnabled ? 'Volume2' : 'VolumeX'} className="w-5 h-5" />
+            </button>
 
             <button 
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
